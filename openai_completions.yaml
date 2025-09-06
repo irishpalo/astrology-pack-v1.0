@@ -1,0 +1,91 @@
+openapi: 3.1.0
+info:
+  title: OpenAI Completions
+  version: 1.0.2
+  description: Minimal spec to call POST https://api.openai.com/v1/completions with model and prompt.
+servers:
+  - url: https://api.openai.com
+security:
+  - OpenAIBearer: []
+paths:
+  /v1/completions:
+    post:
+      operationId: createOpenAICompletion
+      summary: Create completion
+      description: Create a text completion using the specified model and prompt.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpenAICompletionRequest'
+            examples:
+              basic:
+                value:
+                  model: text-davinci-003
+                  prompt: Write a short haiku about the ocean.
+      responses:
+        '200':
+          description: Completion created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenAICompletionResponse'
+        '401':
+          description: Unauthorized (invalid or missing API key)
+        '429':
+          description: Rate limited
+        '500':
+          description: Server error
+components:
+  securitySchemes:
+    OpenAIBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: API key
+  schemas:
+    OpenAICompletionRequest:
+      type: object
+      additionalProperties: true
+      properties:
+        model:
+          type: string
+          description: Model name (e.g., text-davinci-003)
+        prompt:
+          type: string
+          description: Input prompt
+        max_tokens:
+          type: integer
+          minimum: 1
+          description: Max tokens to generate
+        temperature:
+          type: number
+          minimum: 0
+          maximum: 2
+          description: Sampling temperature
+      required: [model, prompt]
+    OpenAICompletionChoice:
+      type: object
+      properties:
+        text: { type: string }
+        index: { type: integer }
+        finish_reason: { type: [string, 'null'] }
+        logprobs: { type: [object, 'null'] }
+      required: [text, index]
+    OpenAICompletionResponse:
+      type: object
+      properties:
+        id: { type: string }
+        object: { type: string }
+        model: { type: string }
+        choices:
+          type: array
+          items:
+            $ref: '#/components/schemas/OpenAICompletionChoice'
+        usage:
+          type: object
+          properties:
+            prompt_tokens: { type: integer }
+            completion_tokens: { type: integer }
+            total_tokens: { type: integer }
+      required: [id, object, model, choices]

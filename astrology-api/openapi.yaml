@@ -1,0 +1,103 @@
+openapi: 3.0.3
+info:
+  title: Astrology Compute API
+  version: "1.0.0"
+servers:
+  - url: https://your-app.onrender.com
+    description: Astrology API base URL
+paths:
+  /:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: OK
+  /natal-charts:
+    post:
+      summary: Create a natal chart
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateNatalChartRequest'
+      responses:
+        "200":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateNatalChartResponse'
+  /transits:
+    post:
+      summary: Compute transits
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComputeTransitsRequest'
+      responses:
+        "200":
+          description: Computed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComputeTransitsResponse'
+components:
+  schemas:
+    IncludeFlags:
+      type: object
+      properties:
+        lots: { type: boolean, default: false }
+        nodes: { type: boolean, default: false }
+        sect: { type: boolean, default: false }
+        visibility: { type: boolean, default: false }
+    CreateNatalChartRequest:
+      type: object
+      required: [date, time, timezone, latitude, longitude]
+      properties:
+        date: { type: string, example: "1992-05-17" }
+        time: { type: string, example: "20:30:00" }
+        timezone: { type: string, example: "Africa/Johannesburg" }
+        latitude: { type: number, format: float }
+        longitude: { type: number, format: float }
+        house_system: { type: string, default: "whole_sign" }
+        zodiac: { type: string, default: "tropical" }
+        include:
+          $ref: '#/components/schemas/IncludeFlags'
+    CreateNatalChartResponse:
+      type: object
+      properties:
+        chartId: { type: string }
+        positions:
+          type: array
+          items: { type: object, additionalProperties: true }
+    TransitAspect:
+      type: object
+      properties:
+        transitingPlanet: { type: string, example: "Mars" }
+        natalPlanet: { type: string, example: "Venus" }
+        type: { type: string, example: "trine" }
+        orbDegrees: { type: number, format: float, example: 2.1 }
+        applying: { type: boolean, example: true }
+    ComputeTransitsRequest:
+      type: object
+      required: [chartId, targetDateTime, timezone]
+      properties:
+        chartId: { type: string }
+        targetDateTime: { type: string, example: "2025-09-04T12:00:00" }
+        timezone: { type: string, example: "Africa/Johannesburg" }
+        orbDegrees: { type: number, format: float, default: 3.0 }
+    ComputeTransitsResponse:
+      type: object
+      properties:
+        chartId: { type: string }
+        targetDateTime: { type: string }
+        aspects:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransitAspect'
+        transitingPositions:
+          type: array
+          items: { type: object, additionalProperties: true }

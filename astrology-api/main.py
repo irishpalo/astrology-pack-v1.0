@@ -3,16 +3,13 @@ from pydantic import BaseModel, Field
 from typing import Optional, List, Dict
 import uuid
 from datetime import datetime, timezone
-from zoneinfo import ZoneInfo  # Python 3.9+
-from math import modf
+from zoneinfo import ZoneInfo
 from skyfield.api import load
 from skyfield.framelib import ecliptic_frame
 
 app = FastAPI(title="Astrology Compute API")
 
-# ============================
-# Data models
-# ============================
+# ---------- Models ----------
 class IncludeFlags(BaseModel):
     lots: bool = False
     nodes: bool = False
@@ -52,16 +49,14 @@ class ComputeTransitsResponse(BaseModel):
     aspects: List[TransitAspect]
     transitingPositions: Optional[List[dict]] = []
 
-# ============================
-# Ephemeris (loaded once)
-# ============================
+# ---------- Ephemeris ----------
 TS = load.timescale()
-EPH = load("de421.bsp")  # downloads on first use
+EPH = load("de421.bsp")           # downloads on first use
 EARTH = EPH["earth"]
 
 ZODIAC = [
-    "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
-    "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"
+    "Aries","Taurus","Gemini","Cancer","Leo","Virgo",
+    "Libra","Scorpio","Sagittarius","Capricorn","Aquarius","Pisces"
 ]
 
 PLANETS = {
@@ -74,11 +69,9 @@ PLANETS = {
     "Saturn": EPH["saturn barycenter"],
 }
 
-# ============================
-# Helpers
-# ============================
+# ---------- Helpers ----------
 def parse_local_to_utc(date_str: str, time_str: str, tz_name: str) -> datetime:
-    """Parse local date/time with an IANA tz and return an aware UTC datetime."""
+    """Parse local date/time in the given IANA timezone and return an aware UTC datetime."""
     if len(time_str) == 5:
         time_str += ":00"
     try:
@@ -89,23 +82,19 @@ def parse_local_to_utc(date_str: str, time_str: str, tz_name: str) -> datetime:
         tz = ZoneInfo(tz_name)
     except Exception:
         raise HTTPException(status_code=400, detail=f"Invalid timezone: {tz_name}")
-    aware_local = naive_local.replace(tzinfo=tz)
-    return aware_local.astimezone(timezone.utc)
+    return naive_local.replace(tzinfo=tz).astimezone(timezone.utc)
 
-def utc_datetime_to_ts(dt_utc: datetime):
-    """Build Skyfield Time using explicit UTC components (avoids any ambiguity)."""
-    # Ensure UTC & integer seconds
+def ts_from_utc(dt_utc: datetime):
+    """Construct Skyfield Time explicitly in UTC (avoids ambiguity)."""
     dt_utc = dt_utc.astimezone(timezone.utc)
-    # seconds can have fractions; preserve them
-    sec_float = dt_utc.second + dt_utc.microsecond / 1_000_000
-    return TS.utc(dt_utc.year, dt_utc.month, dt_utc.day, dt_utc.hour, dt_utc.minute, sec_float)
+    sec = dt_utc.second + dt_utc.microsecond / 1_000_000
+    return TS.utc(dt_utc.year, dt_utc.month, dt_utc.day, dt_utc.hour, dt_utc.minute, sec)
 
 def lon_to_sign_deg(lon_deg: float) -> Dict[str, float | int | str]:
-    # Normalize to [0, 360)
     lon_deg = lon_deg % 360.0
-    sign_index = int(lon_deg // 30)
-    sign = ZODIAC[sign_index]
-    deg_in_sign = lon_deg - 30 * sign_index
+    sign_idx = int(lon_deg // 30)
+    sign = ZODIAC[sign_idx]
+    deg_in_sign = lon_deg - 30 * sign_idx
     d = int(deg_in_sign)
     m_full = (deg_in_sign - d) * 60
     m = int(m_full)
@@ -113,19 +102,15 @@ def lon_to_sign_deg(lon_deg: float) -> Dict[str, float | int | str]:
     return {"sign": sign, "deg": d, "min": m, "sec": s, "lonDeg": round(lon_deg, 6)}
 
 def compute_geocentric_ecliptic_longitudes(t) -> List[dict]:
-    """Compute apparent geocentric ecliptic longitudes for the traditional planets."""
-    positions = []
+    """Apparent geocentric ecliptic longitudes for traditional planets."""
+    out = []
     for name, target in PLANETS.items():
-        # Apparent position (light-time & aberration corrections)
         astrometric = EARTH.at(t).observe(target).apparent()
         lon, lat, distance = astrometric.frame_latlon(ecliptic_frame)
-        pos = lon_to_sign_deg(lon.degrees)
-        positions.append({"planet": name, **pos})
-    return positions
+        out.append({"planet": name, **lon_to_sign_deg(lon.degrees)})
+    return out
 
-# ============================
-# Endpoints
-# ============================
+# ---------- Endpoints ----------
 @app.get("/")
 def health():
     return {"status": "ok", "service": "Astrology Compute API"}
@@ -134,41 +119,18 @@ CHART_STORE: Dict[str, dict] = {}
 
 @app.post("/natal-charts", response_model=CreateNatalChartResponse)
 def create_natal_chart(body: CreateNatalChartRequest):
-    # Convert provided local time to UTC, then to Skyfield Time
     dt_utc = parse_local_to_utc(body.date, body.time, body.timezone)
-    t = utc_datetime_to_ts(dt_utc)
-
-    # Compute apparent ecliptic longitudes (location not used here; parallax negligible except Moon)
+    t = ts_from_utc(dt_utc)
     positions = compute_geocentric_ecliptic_longitudes(t)
-
     cid = "chart_" + uuid.uuid4().hex[:10]
-    CHART_STORE[cid] = {
-        "dt_utc": dt_utc.isoformat(),
-        "positions": positions,
-        "request": body.model_dump(),
-    }
+    CHART_STORE[cid] = {"dt_utc": dt_utc.isoformat(), "positions": positions, "request": body.model_dump()}
     return CreateNatalChartResponse(chartId=cid, positions=positions)
 
 @app.post("/transits", response_model=ComputeTransitsResponse)
 def compute_transits(body: ComputeTransitsRequest):
-    # Validate target datetime (accept with/without trailing Z)
     try:
-        _ = datetime.fromisoformat(body.targetDateTime.replace("Z", ""))
+        _ = datetime.fromisoformat(body.targetDateTime.replace("Z",""))
     except ValueError:
         raise HTTPException(status_code=400, detail="targetDateTime must be ISO 8601")
-
-    # Placeholder aspect until you want real aspect logic
-    sample = [TransitAspect(
-        transitingPlanet="Mars",
-        natalPlanet="Venus",
-        type="trine",
-        orbDegrees=2.1,
-        applying=True,
-    )]
-
-    return ComputeTransitsResponse(
-        chartId=body.chartId,
-        targetDateTime=body.targetDateTime,
-        aspects=sample,
-        transitingPositions=[],
-    )
+    sample = [TransitAspect(transitingPlanet="Mars", natalPlanet="Venus", type="trine", orbDegrees=2.1, applying=True)]
+    return ComputeTransitsResponse(chartId=body.chartId, targetDateTime=body.targetDateTime, aspects=sample, transitingPositions=[])

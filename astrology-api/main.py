@@ -128,6 +128,12 @@ from typing import Optional, List, Dict
 import uuid
 from datetime import datetime
 from zoneinfo import ZoneInfo  # Python 3.9+
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, Field
+from typing import Optional, List, Dict
+import uuid
+from datetime import datetime
+from zoneinfo import ZoneInfo  # Python 3.9+
 from skyfield.api import load
 from skyfield.framelib import ecliptic_frame
 
@@ -142,7 +148,7 @@ class IncludeFlags(BaseModel):
 
 class CreateNatalChartRequest(BaseModel):
     date: str                      # "YYYY-MM-DD"
-    time: str                      # "HH:MM:SS" or "HH:MM"
+    time: str                      # "HH:MM[:SS]"
     timezone: str                  # e.g. "Africa/Johannesburg"
     latitude: float = Field(ge=-90, le=90)
     longitude: float = Field(ge=-180, le=180)
@@ -194,7 +200,6 @@ PLANETS = {
 }
 
 def to_dt(date_str: str, time_str: str, tz_name: str) -> datetime:
-    # Allow "HH:MM" or "HH:MM:SS"
     if len(time_str) == 5:
         time_str += ":00"
     try:
@@ -232,7 +237,6 @@ def compute_geocentric_ecliptic_longitudes(dt: datetime) -> List[dict]:
 def health():
     return {"status": "ok", "service": "Astrology Compute API"}
 
-# Simple in-memory store (resets on redeploy)
 CHART_STORE: Dict[str, dict] = {}
 
 @app.post("/natal-charts", response_model=CreateNatalChartResponse)
@@ -249,7 +253,6 @@ def compute_transits(body: ComputeTransitsRequest):
         _ = datetime.fromisoformat(body.targetDateTime.replace("Z",""))
     except ValueError:
         raise HTTPException(status_code=400, detail="targetDateTime must be ISO 8601")
-    # placeholder aspect
     sample = [TransitAspect(
         transitingPlanet="Mars",
         natalPlanet="Venus",

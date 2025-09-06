@@ -6,11 +6,10 @@ from zoneinfo import ZoneInfo
 from skyfield.api import load
 import hashlib, pathlib
 
-APP_VERSION = "astro-api v2"
+APP_VERSION = "astro-api v4"
 
 app = FastAPI(title=f"Astrology API ({APP_VERSION})")
 
-# ---------- Fingerprint & health ----------
 @app.get("/__whoami")
 def whoami():
     p = pathlib.Path(__file__)
@@ -24,7 +23,6 @@ def health():
 def ping():
     return {"message": "pong", "version": APP_VERSION}
 
-# ---------- Models ----------
 class IncludeFlags(BaseModel):
     lots: bool = False
     nodes: bool = False
@@ -55,12 +53,10 @@ class PositionsReq(BaseModel):
         except ValueError: raise ValueError("time must be HH:MM (24-hour)")
         return v
 
-# ---------- Timezone & math helpers ----------
 def parse_tz(tz: str) -> timezone:
     if "/" in tz:
         try: return ZoneInfo(tz)
         except Exception: raise HTTPException(400, f"Unknown IANA timezone: {tz}")
-    # fixed offsets: +02:00 / -05:30 or +0200
     try:
         if len(tz) in (6, 9) and tz[0] in "+-" and tz[3] == ":":
             sign = 1 if tz[0] == "+" else -1
@@ -86,7 +82,6 @@ def split_dms(lon_deg: float):
     s = round((m_float - m) * 60, 2)
     return sign_i, d, m, s, round(total, 6)
 
-# ---------- Skyfield preload ----------
 TS = load.timescale()
 EPH = load("de421.bsp")
 EARTH = EPH["earth"]
@@ -114,11 +109,11 @@ def geocentric_ecliptic_longitudes(t) -> Dict[str, float]:
     for name, key in BODY_KEYS.items():
         target = resolve_body(key)
         ast = EARTH.at(t).observe(target).apparent()
-        lon, lat, dist = ast.ecliptic_latlon()  # tropical ecliptic of date
-        longs[name] = lon.degrees % 360.0
+        # CORRECT: ecliptic_latlon() returns (longitude, latitude, distance)
+        lon, lat, dist = ast.ecliptic_latlon()
+        longs[name] = float(lon.degrees % 360.0)
     return longs
 
-# ---------- Route ----------
 @app.post("/positions")
 def positions(req: PositionsReq):
     try:
@@ -139,14 +134,7 @@ def positions(req: PositionsReq):
     for planet in ["Sun","Moon","Mercury","Venus","Mars","Jupiter","Saturn"]:
         lon = longs[planet]
         si, d, m, s, total = split_dms(lon)
-        out.append({
-            "planet": planet,
-            "sign": SIGN_NAMES[si],
-            "deg": d,
-            "min": m,
-            "sec": s,
-            "lonDeg": total
-        })
+        out.append({"planet": planet, "sign": SIGN_NAMES[si], "deg": d, "min": m, "sec": s, "lonDeg": total})
 
     return {
         "chartId": f"chart_{utc_dt.isoformat()}",

@@ -7,15 +7,11 @@ from skyfield.api import load
 from skyfield.framelib import ecliptic_frame
 import hashlib, pathlib
 
-APP_VERSION = "astro-api v5"
+APP_VERSION = "astro-api v7"
 
 app = FastAPI(title=f"Astrology API ({APP_VERSION})")
 
-@app.get("/__whoami")
-def whoami():
-    p = pathlib.Path(__file__)
-    return {"file": str(p), "sha256": hashlib.sha256(p.read_bytes()).hexdigest(), "version": APP_VERSION}
-
+# -------- Health ----------
 @app.get("/")
 def health():
     return {"ok": True, "version": APP_VERSION}
@@ -24,6 +20,12 @@ def health():
 def ping():
     return {"message": "pong", "version": APP_VERSION}
 
+@app.get("/__whoami")
+def whoami():
+    p = pathlib.Path(__file__)
+    return {"file": str(p), "sha256": hashlib.sha256(p.read_bytes()).hexdigest(), "version": APP_VERSION}
+
+# -------- Models ----------
 class IncludeFlags(BaseModel):
     lots: bool = False
     nodes: bool = False
@@ -33,7 +35,7 @@ class IncludeFlags(BaseModel):
 class PositionsReq(BaseModel):
     date: str = Field(..., description="YYYY-MM-DD")
     time: str = Field(..., description="HH:MM 24h")
-    timezone: str = Field(..., description='IANA like "Africa/Johannesburg" or fixed "+02:00"')
+    timezone: str = Field(..., description='IANA "Africa/Johannesburg" or fixed "+02:00"')
     latitude: float = Field(..., ge=-90, le=90)
     longitude: float = Field(..., ge=-180, le=180)
     house_system: Literal["whole_sign"]
@@ -54,10 +56,13 @@ class PositionsReq(BaseModel):
         except ValueError: raise ValueError("time must be HH:MM (24-hour)")
         return v
 
+# -------- Time helpers ----------
 def parse_tz(tz: str) -> timezone:
     if "/" in tz:
-        try: return ZoneInfo(tz)
-        except Exception: raise HTTPException(400, f"Unknown IANA timezone: {tz}")
+        try:
+            return ZoneInfo(tz)
+        except Exception:
+            raise HTTPException(400, f"Unknown IANA timezone: {tz}")
     try:
         if len(tz) in (6, 9) and tz[0] in "+-" and tz[3] == ":":
             sign = 1 if tz[0] == "+" else -1
@@ -71,6 +76,7 @@ def to_utc(d: str, hhmm: str, tz: str) -> datetime:
     local = datetime.fromisoformat(f"{d}T{hhmm}:00")
     return local.replace(tzinfo=parse_tz(tz)).astimezone(timezone.utc)
 
+# -------- Formatting ----------
 SIGN_NAMES = ["Aries","Taurus","Gemini","Cancer","Leo","Virgo","Libra","Scorpio","Sagittarius","Capricorn","Aquarius","Pisces"]
 
 def split_dms(lon_deg: float):
@@ -83,6 +89,7 @@ def split_dms(lon_deg: float):
     s = round((m_float - m) * 60, 2)
     return sign_i, d, m, s, round(total, 6)
 
+# -------- Skyfield (one-time) ----------
 TS = load.timescale()
 EPH = load("de421.bsp")
 EARTH = EPH["earth"]
@@ -106,14 +113,17 @@ def resolve_body(key):
     return EPH[key]
 
 def geocentric_ecliptic_longitudes(t) -> Dict[str, float]:
+    """Tropical ecliptic longitudes of date (0° = vernal equinox of date)."""
     longs: Dict[str, float] = {}
     for name, key in BODY_KEYS.items():
         target = resolve_body(key)
         ast = EARTH.at(t).observe(target).apparent()
-        lon, lat, dist = ast.frame_latlon(ecliptic_frame)  # ✅ CORRECT
+        # ✅ Skyfield returns (latitude, longitude, distance)
+        lat, lon, dist = ast.frame_latlon(ecliptic_frame)
         longs[name] = float(lon.degrees % 360.0)
     return longs
 
+# -------- Route ----------
 @app.post("/positions")
 def positions(req: PositionsReq):
     try:

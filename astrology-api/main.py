@@ -4,6 +4,7 @@ from typing import Optional, List, Dict
 import uuid
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo  # Python 3.9+
+from math import modf
 from skyfield.api import load
 from skyfield.framelib import ecliptic_frame
 
@@ -76,30 +77,31 @@ PLANETS = {
 # ============================
 # Helpers
 # ============================
-def to_dt(date_str: str, time_str: str, tz_name: str) -> datetime:
-    """
-    Parse a local date/time in the given IANA timezone and return an aware UTC datetime.
-    """
-    # Allow "HH:MM" or "HH:MM:SS"
+def parse_local_to_utc(date_str: str, time_str: str, tz_name: str) -> datetime:
+    """Parse local date/time with an IANA tz and return an aware UTC datetime."""
     if len(time_str) == 5:
         time_str += ":00"
-
     try:
         naive_local = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M:%S")
     except ValueError:
         raise HTTPException(status_code=400, detail="date/time must be ISO (YYYY-MM-DD / HH:MM[:SS])")
-
     try:
         tz = ZoneInfo(tz_name)
     except Exception:
         raise HTTPException(status_code=400, detail=f"Invalid timezone: {tz_name}")
-
-    # Attach local tz and convert to UTC
     aware_local = naive_local.replace(tzinfo=tz)
-    aware_utc = aware_local.astimezone(timezone.utc)
-    return aware_utc
+    return aware_local.astimezone(timezone.utc)
+
+def utc_datetime_to_ts(dt_utc: datetime):
+    """Build Skyfield Time using explicit UTC components (avoids any ambiguity)."""
+    # Ensure UTC & integer seconds
+    dt_utc = dt_utc.astimezone(timezone.utc)
+    # seconds can have fractions; preserve them
+    sec_float = dt_utc.second + dt_utc.microsecond / 1_000_000
+    return TS.utc(dt_utc.year, dt_utc.month, dt_utc.day, dt_utc.hour, dt_utc.minute, sec_float)
 
 def lon_to_sign_deg(lon_deg: float) -> Dict[str, float | int | str]:
+    # Normalize to [0, 360)
     lon_deg = lon_deg % 360.0
     sign_index = int(lon_deg // 30)
     sign = ZODIAC[sign_index]
@@ -110,11 +112,12 @@ def lon_to_sign_deg(lon_deg: float) -> Dict[str, float | int | str]:
     s = round((m_full - m) * 60, 2)
     return {"sign": sign, "deg": d, "min": m, "sec": s, "lonDeg": round(lon_deg, 6)}
 
-def compute_geocentric_ecliptic_longitudes(dt_utc: datetime) -> List[dict]:
-    t = TS.from_datetime(dt_utc)  # dt_utc must be timezone-aware UTC
+def compute_geocentric_ecliptic_longitudes(t) -> List[dict]:
+    """Compute apparent geocentric ecliptic longitudes for the traditional planets."""
     positions = []
     for name, target in PLANETS.items():
-        astrometric = EARTH.at(t).observe(target)
+        # Apparent position (light-time & aberration corrections)
+        astrometric = EARTH.at(t).observe(target).apparent()
         lon, lat, distance = astrometric.frame_latlon(ecliptic_frame)
         pos = lon_to_sign_deg(lon.degrees)
         positions.append({"planet": name, **pos})
@@ -127,13 +130,17 @@ def compute_geocentric_ecliptic_longitudes(dt_utc: datetime) -> List[dict]:
 def health():
     return {"status": "ok", "service": "Astrology Compute API"}
 
-# simple in-memory store (resets on redeploy)
 CHART_STORE: Dict[str, dict] = {}
 
 @app.post("/natal-charts", response_model=CreateNatalChartResponse)
 def create_natal_chart(body: CreateNatalChartRequest):
-    dt_utc = to_dt(body.date, body.time, body.timezone)
-    positions = compute_geocentric_ecliptic_longitudes(dt_utc)
+    # Convert provided local time to UTC, then to Skyfield Time
+    dt_utc = parse_local_to_utc(body.date, body.time, body.timezone)
+    t = utc_datetime_to_ts(dt_utc)
+
+    # Compute apparent ecliptic longitudes (location not used here; parallax negligible except Moon)
+    positions = compute_geocentric_ecliptic_longitudes(t)
+
     cid = "chart_" + uuid.uuid4().hex[:10]
     CHART_STORE[cid] = {
         "dt_utc": dt_utc.isoformat(),
@@ -144,13 +151,13 @@ def create_natal_chart(body: CreateNatalChartRequest):
 
 @app.post("/transits", response_model=ComputeTransitsResponse)
 def compute_transits(body: ComputeTransitsRequest):
-    # Validate target datetime format (we accept with/without trailing 'Z')
+    # Validate target datetime (accept with/without trailing Z)
     try:
         _ = datetime.fromisoformat(body.targetDateTime.replace("Z", ""))
     except ValueError:
         raise HTTPException(status_code=400, detail="targetDateTime must be ISO 8601")
 
-    # Placeholder aspect sample
+    # Placeholder aspect until you want real aspect logic
     sample = [TransitAspect(
         transitingPlanet="Mars",
         natalPlanet="Venus",

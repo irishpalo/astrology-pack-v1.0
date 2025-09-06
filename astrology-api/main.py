@@ -4,9 +4,10 @@ from typing import Literal, Dict
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 from skyfield.api import load
+from skyfield.framelib import ecliptic_frame
 import hashlib, pathlib
 
-APP_VERSION = "astro-api v4"
+APP_VERSION = "astro-api v5"
 
 app = FastAPI(title=f"Astrology API ({APP_VERSION})")
 
@@ -109,8 +110,7 @@ def geocentric_ecliptic_longitudes(t) -> Dict[str, float]:
     for name, key in BODY_KEYS.items():
         target = resolve_body(key)
         ast = EARTH.at(t).observe(target).apparent()
-        # CORRECT: ecliptic_latlon() returns (longitude, latitude, distance)
-        lon, lat, dist = ast.ecliptic_latlon()
+        lon, lat, dist = ast.frame_latlon(ecliptic_frame)  # ✅ CORRECT
         longs[name] = float(lon.degrees % 360.0)
     return longs
 

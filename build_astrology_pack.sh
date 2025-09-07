@@ -19,7 +19,7 @@ cat > "$PKG/astrology_keywords_pack.md" <<'MD'
 ---
 title: Astrology Keywords Pack
 version: 1.0
-last_updated: 2025-09-02
+last_updated: 2025-09-07
 ---
 
 # ASTROLOGY KEYWORDS PACK
@@ -64,6 +64,49 @@ sexual desire; romantic attachment; motherhood [nurturing]; nursing; priesthood;
 
 ## Mercury
 education; writing; debate; speech; oratory; brotherhood; interpretation; heraldry; number; calculation; geometry; commerce; youth; play; theft; community; message; letter; service; profit; discovery; obedience; contest; wrestling; declamation; certification; sealing; weighing; suspense; testing; hearing; versatility; critical thought; judgement; sibling [younger]; younger child; market; banking; public service; temple service; authority [administrative]; leasing; labour contract; rhythmic performance; administration; body-guarding; robe [sacred]; pomp [ceremonial]; fortune [irregular]; distraction; building; modelling; sculpture; medicine; teaching; law; oratory [forensic]; philosophy; architecture; music; divination; sacrifice; augury; dream interpretation; weaving; astrology; performance; acting; public office; copper; coinage; exchange; hand; shoulder; finger; joint; belly; intestine; tongue; windpipe
+
+### Outer Planets (Distortions)
+
+## Uranus (Ouranos)
+rebellion; upheaval; revolution; novelty; invention; innovation; discovery; reform; separation; exile; fugitive; dissident; radical; accident; fracture; rupture; lightning; thunder; earthquake; explosion; fire from heaven; electricity; magnetism; machinery; contrivance; calculation; flight; suddenness; nerves; circulation; convulsion; spasm; abrupt change
+
+## Neptune (Poseidōn)
+illusion; dream; vision; prophecy; mysticism; spirituality; devotion; compassion; sacrifice; disappearance; fraud; deception; trickery; intoxication; stupor; drunkenness; narcotic; drug; vapour; mist; fog; flood; deluge; sea; ocean; tide; seafaring; navigation; fishing; oil; liquid; music; poetry; theatre; fantasy; infection; fluid disease; immune weakness
+
+## Pluto (Haidēs)
+power; domination; tyranny; compulsion; obsession; secrecy; conspiracy; espionage; revolution; subversion; destruction; annihilation; purification; renewal; rebirth; underworld; corpse; death; tomb; grave; burial; wealth; treasure; mine; cavern; metal; mineral; hidden fire; eruption; earthquake; volcano; sexuality; reproduction; potency; elimination; excretion; putrefaction; cancer; pestilence; degeneration
+
+### Asteroids
+
+## Chiron (Kheirōn)
+wound; injury; trauma; sickness; chronic illness; scar; pain; exile; rejection; outsider; teacher; tutor; mentor; pedagogue; philosopher; sage; counsellor; guide; healer; physician; surgeon; herbalist; midwife; shaman; mediator; go-between; initiation; apprenticeship; rehabilitation; therapy; recovery; bone; joint; sinew; ligament; connective tissue
+
+### Angles
+
+## Ascendant (Horoskopos)
+life; body; figure; appearance; stature; complexion; temperament; vitality; strength; health; birth; beginnings; foundations; orientation; direction; self; identity; horizon; east; head
+
+## Descendant (Dysis)
+marriage; spouse; union; partnership; contracts; agreement; cooperation; rivalry; opposition; litigation; open enemies; separation; exile; banishment; descent; decline; death; west
+
+## Midheaven (Mesouranēma)
+rank; honour; office; authority; governance; profession; career; reputation; fame; action; achievement; accomplishment; success; dignity; advancement; mother; authority of parents; high place; culmination; height
+
+## Imum Coeli (Hypogeion)
+parents; father; home; house; dwelling; land; property; foundations; inheritance; ancestry; family; origins; hidden matters; secrecy; end of life; burial; subterranean places; depth
+
+### Points (Nodes)
+
+## North Node (Caput Draconis)
+increase; gain; advancement; prosperity; elevation; augmentation; multiplication; promotion; honour; reputation; wealth; fortune; growth; ambition; success; accumulation; exaggeration; excess
+
+## South Node (Cauda Draconis)
+decrease; loss; decline; diminution; poverty; scattering; exile; separation; alienation; deprivation; disgrace; misfortune; dispersion; release; downfall; exhaustion; instability
+
+### Lots
+
+## Lot of Fortune (Tychē)
+body; life; health; fortune; accident; fate; chance; prosperity; wealth; property; possessions; acquisition; loss; livelihood; sustenance; work; profession; rank; reputation; honour; rise; fall; wandering; travel; journeys; the people; public events; external circumstances
 
 ---
 
@@ -315,7 +358,7 @@ echo "→ Wrote $PKG/openai_completions.yaml"
 # 3) Privacy policy
 cat > "$PKG/privacy.md" <<'MD'
 # Privacy Policy — Irish Palo
-**Effective date:** 2025-09-02  
+**Effective date:** 2025-09-07  
 **Contact:** irish.palo@gmail.com
 
 This Privacy Policy explains how **Irish Palo** (“we”, “us”, “our”) processes information when you use our ChatGPT Action (“the Action”). The Action is intended for both consumers and businesses and is not for users under 16.
